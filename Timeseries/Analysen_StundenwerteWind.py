@@ -10,6 +10,7 @@ from datetime import date
 from matplotlib.dates import DateFormatter
 import matplotlib.dates as mdates
 
+
 def read_data(file):
     """
 
@@ -33,9 +34,20 @@ def annual_cycle(df):
     :param df:
     :return:
     """
-    df = df.groupby([df.index.month, df.index.day]).mean()
-    return df
 
+    def q1(x):
+        return x.quantile(.25)
+
+    def q2(x):
+        return x.median()
+
+    def q3(x):
+        return x.quantile(.75)
+
+    df_q1 = df.groupby([df.index.month, df.index.day]).agg(q1)
+    df_q2 = df.groupby([df.index.month, df.index.day]).agg(q2)
+    df_q3 = df.groupby([df.index.month, df.index.day]).agg(q3)
+    return [df_q1, df_q2, df_q3]
 
 def wind_scatterplot(df, path):
     """
@@ -51,7 +63,7 @@ def wind_scatterplot(df, path):
     fig.show()
 
 
-def plot_annual_cycle(ser, path, plot_current_date=False):
+def plot_annual_cycle(dfs,  path, stationname, plot_current_date=False):
     """
 
     :param ser: pandas.core.series.Series
@@ -67,8 +79,12 @@ def plot_annual_cycle(ser, path, plot_current_date=False):
             "2020-" + str(current_month) + "-" + str(current_day))
 
     fig, ax = plt.subplots()
-    ax.plot(timeline, ser.rolling(window=14, center=True).mean().values,
-            c='k', label="Daily average windspeed, 14 day rolling mean")
+    ax.plot(timeline, dfs[0].rolling(window=24, center=True).mean().values,
+            c='b', label="25th percentile")
+    ax.plot(timeline, dfs[1].rolling(window=24, center=True).mean().values,
+            c='k', label="Median")
+    ax.plot(timeline, dfs[2].rolling(window=24, center=True).mean().values,
+            c='r', label="75th percentile")
     ax.xaxis.set_major_formatter(DateFormatter("%b"))
     ax.xaxis.set_major_locator(mdates.MonthLocator())
     if plot_current_date:
@@ -76,18 +92,19 @@ def plot_annual_cycle(ser, path, plot_current_date=False):
     ax.legend()
     ax.set_xlim(left=pd.to_datetime("2020-01-01"),
                 right=pd.to_datetime("2020-12-31"))
-    ax.set(ylabel="Average daily windspeed [m/s]", xlabel="Month")
+    ax.set(ylabel="Average hourly windspeed [m/s]", xlabel="Month")
     ax.grid()
+    ax.set(title=f"Average hourly windspeed in {stationname}, 24 hours "
+                 f"rolling mean applied")
+    plt.tight_layout()
     fig.savefig(savefigto, dpi=500)
     fig.show()
 
 
 if __name__ == "__main__":
-    path = (r"C:\Users\sb123\Desktop\Klima\observations_germany"
-            r"\Gluecksburg"
+    path = (r"C:\Users\sb123\Documents\observations_germany\Gluecksburg"
             r"\stundenwerte_FF_01666_19710101_20071231_hist"
             r"\produkt_ff_stunde_19710101_20071231_01666.txt")
     wind = read_data(path)
     # wind_scatterplot(wind, path)
-    wind_annual = annual_cycle(wind.loc[:, "   F"])
-    plot_annual_cycle(wind_annual, path)
+    plot_annual_cycle(annual_cycle(wind.loc[:, "   F"]), path, "Glücksburg")
