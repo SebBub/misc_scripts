@@ -1,10 +1,14 @@
-# TODO learn how to create issues and push them to GITHUB
 """ Plot grid of .nc files at a specified area.
 
 This script overlays the grids of two .nc files on a map for visualisation
 around a point (lat/lon). Main objective  is to quickly get a feeling for
 how spatial dimensions (e.g. topography) and grid spacing relate. Can also
-be used to see how many gridpoints fall within the area of interest."""
+be used to see how many gridpoints fall within the area of interest.
+
+Also includes methods for writing grid points/cells to shapefiles.
+
+TODO: only works for regular grids!
+"""
 
 # Imports
 import os
@@ -130,9 +134,55 @@ def plot_grids(overlay=False, offset=5, figsize=(7, 7), shapefile=None):
     # fig.savefig(savefigs_to / "ERA5.png",
     #             dpi=500)
 
+def write_shp_pts():
+    """
+    writes the grids to point shapefiles
+    
+    uses the filenames of the nc-files and appends ".gridpts.shp"
+    """
+    for datafile, grid in zip(datafiles, grids): # assume the two lists `grids` and `datafiles` are in the same order
+        shp_file = datafile + ".gridpts.shp"
+        with shapefile.Writer(shp_file, shapefile.POINT) as shp:
+            shp.field("lat", 'F', decimal=3)
+            shp.field("lon", 'F', decimal=3)
+            lats, lons = gridpoints
+            for lat in lats:
+                for lon in lons:
+                    shp.point(lon, lat)
+                    shp.record(lat, lon) 
 
+def write_shp_poly():
+    """
+    writes the grids to polygon shapefiles
+    
+    uses the filenames of the nc-files and appends ".gridcells.shp"
+    """
+    for datafile, grid in zip(datafiles, grids): # assume the two lists `grids` and `datafiles` are in the same order
+        shp_file = datafile + ".gridcells.shp"
+        with shapefile.Writer(shp_file, shapefile.POLYGON) as shp:
+            shp.field("lat", 'F', decimal=3)
+            shp.field("lon", 'F', decimal=3)
+            lats, lons = gridpoints
+            # assumes a regular grid
+            size_lat = lats[1] - lats[0] 
+            size_lon = lons[1] - lons[0]
+            for lat in lats:
+                for lon in lons:
+                    shp.poly([[
+                        [lon - size_lon/2, lat - size_lat/2], # bottom left
+                        [lon + size_lon/2, lat - size_lat/2], # top left
+                        [lon + size_lon/2, lat + size_lat/2], # top right
+                        [lon - size_lon/2, lat + size_lat/2], # bottom right
+                        [lon - size_lon/2, lat - size_lat/2]  # bottom left again to close the loop
+                    ]])
+                    shp.record(lat, lon)
+                
+                
 if __name__ == "__main__":
     shape = r"C:\Users\sb123\Documents\OneDrive\04_SS22\climThesis\Data\Geo" \
             r"\vg250_12-31.utm32s.shape.ebenen\vg250_12-31.utm32s.shape" \
             r".ebenen\vg250_ebenen_1231\VG250_LAN.shp"
     plot_grids(overlay=True, shapefile=shape)
+    # write shapefiles:
+    #write_shp_pts()
+    #write_shp_poly()
